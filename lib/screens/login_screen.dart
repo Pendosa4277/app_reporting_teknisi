@@ -1,6 +1,8 @@
 // File: lib/screens/login_screen.dart
 
 import 'package:flutter/material.dart';
+// Import layar pendaftaran (akan dibuat jika belum ada)
+import 'package:app_reporting_teknisi/screens/register_screen.dart';
 
 // Definisi enum untuk peran (Role) pengguna
 enum UserRole { technician, supervisor }
@@ -164,6 +166,25 @@ class _LoginScreenState extends State<LoginScreen> {
                     'LOGIN',
                     style: TextStyle(fontSize: 18, color: Colors.white),
                   ),
+                ),
+                const SizedBox(height: 10),
+                // Bar untuk pendaftaran jika belum punya akun
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text('Belum punya akun? '),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const RegisterScreen(),
+                          ),
+                        );
+                      },
+                      child: const Text('Daftar'),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 20),
                 if (_errorMessage != null)
