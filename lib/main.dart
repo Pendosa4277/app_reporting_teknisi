@@ -11,11 +11,11 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   const supabaseUrl = String.fromEnvironment(
-    'https://scggbgdtpqysqjwmjbzo.supabase.co',
+    'https://zktnthewyxkqlwvvhknk.supabase.co',
     defaultValue: '',
   );
   const supabaseAnonKey = String.fromEnvironment(
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNjZ2diZ2R0cHF5c3Fqd21qYnpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIwMDU2MzQsImV4cCI6MjA3NzU4MTYzNH0.GG2E_JsVDp_f2_iy_RAFxcU_v6-P_0viOEJl_Yxl9jU',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InprdG50aGV3eXhrcWx3dnZoa25rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIwMTMxOTEsImV4cCI6MjA3NzU4OTE5MX0.vhcl7lOQom625DBN-svGLQd7qS2Vixaki9OWO621N6Y',
     defaultValue: '',
   );
 

@@ -10,69 +10,102 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
-  final TextEditingController _confirmController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmController = TextEditingController();
   String _selectedRole = 'technician';
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmController.dispose();
+    super.dispose();
+  }
+
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final email = _emailController.text.trim();
-    final password = _passwordController.text;
-    // Guard: ensure Supabase has been initialized (avoid assertion failure)
     try {
-      // Accessing Supabase.instance.client will throw if not initialized
-      final _ = Supabase.instance.client;
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Supabase belum diinisialisasi. Jalankan aplikasi dengan SUPABASE_URL dan SUPABASE_ANON_KEY.',
-          ),
-        ),
-      );
-      return;
-    }
-    try {
-      final res = await Supabase.instance.client.auth.signUp(
+      // Show loading
+      _showLoading();
+
+      final supabase = Supabase.instance.client;
+      final email = _emailController.text.trim();
+      final password = _passwordController.text;
+
+      // Sign up user
+      final res = await supabase.auth.signUp(
         email: email,
         password: password,
+        data: {'role': _selectedRole},
       );
 
-      final user = res.user;
-      // Try to persist role into a `profiles` table (optional). If the table
-      // doesn't exist the insert will fail — that's fine, we silently continue.
-      try {
-        if (user != null) {
-          await Supabase.instance.client.from('profiles').insert({
-            'id': user.id,
-            'email': email,
-            'role': _selectedRole,
-          });
-        }
-      } catch (_) {
-        // ignore errors if table missing or insert fails
+      if (!mounted) return;
+      Navigator.pop(context); // Dismiss loading
+
+      if (res.user == null) {
+        _showError('Gagal mendaftar: Akun tidak dapat dibuat');
+        return;
       }
 
+      // Create profile
+      await supabase.from('profiles').insert({
+        'id': res.user!.id,
+        'email': email,
+        'role': _selectedRole,
+      });
+
       if (!mounted) return;
+
+      // Show success message and return to login
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Pendaftaran berhasil (cek email jika perlu konfirmasi)',
+            'Pendaftaran berhasil! Silakan cek email untuk konfirmasi.',
           ),
+          backgroundColor: Colors.green,
         ),
       );
 
-      await Future.delayed(const Duration(milliseconds: 800));
-      if (!mounted) return;
       Navigator.pop(context);
     } catch (err) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal mendaftar: ${err.toString()}')),
-      );
+
+      String message = err is AuthException
+          ? _getAuthErrorMessage(err.message)
+          : 'Gagal mendaftar: ${err.toString()}';
+
+      _showError(message);
     }
+  }
+
+  void _showLoading() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
+    );
+  }
+
+  String _getAuthErrorMessage(String code) => switch (code) {
+    'User already registered' => 'Email sudah terdaftar',
+    'Invalid email' => 'Format email tidak valid',
+    'Weak password' => 'Password terlalu lemah',
+    _ => code,
+  };
+
+  void _showSuccess(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.green),
+    );
   }
 
   @override
@@ -100,23 +133,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   decoration: const InputDecoration(
                     labelText: 'Email',
                     border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.email),
+                    hintText: 'Masukkan email anda',
                   ),
-                  validator: (v) {
-                    if (v == null || v.isEmpty) {
-                      return 'Email tidak boleh kosong';
-                    }
-                    if (!v.contains('@')) {
-                      return 'Masukkan email yang valid';
-                    }
-                    return null;
+                  validator: (v) => v == null || v.isEmpty
+                      ? 'Email tidak boleh kosong'
+                      : !v.contains('@') || !v.contains('.')
+                      ? 'Masukkan email yang valid'
+                      : null,
+                  onChanged: (_) {
+                    // Reset form errors on change
+                    _formKey.currentState?.validate();
                   },
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  initialValue: _selectedRole,
+                  value: _selectedRole,
                   decoration: const InputDecoration(
-                    labelText: 'Roleplay ',
+                    labelText: 'Pilih Role',
                     border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.work),
                   ),
                   items: const [
                     DropdownMenuItem(
@@ -138,15 +174,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   decoration: const InputDecoration(
                     labelText: 'Password',
                     border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.lock),
+                    hintText: 'Minimal 6 karakter',
                   ),
-                  validator: (v) {
-                    if (v == null || v.isEmpty) {
-                      return 'Password tidak boleh kosong';
-                    }
-                    if (v.length < 3) {
-                      return 'Password terlalu pendek';
-                    }
-                    return null;
+                  validator: (v) => v == null || v.isEmpty
+                      ? 'Password tidak boleh kosong'
+                      : v.length < 6
+                      ? 'Password minimal 6 karakter'
+                      : null,
+                  onChanged: (_) {
+                    // Revalidate confirm password when password changes
+                    _formKey.currentState?.validate();
                   },
                 ),
                 const SizedBox(height: 12),
@@ -156,27 +194,35 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   decoration: const InputDecoration(
                     labelText: 'Konfirmasi Password',
                     border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.lock_outline),
+                    hintText: 'Masukkan password kembali',
                   ),
-                  validator: (v) {
-                    if (v == null || v.isEmpty) {
-                      return 'Konfirmasi password diperlukan';
-                    }
-                    if (v != _passwordController.text) {
-                      return 'Password tidak cocok';
-                    }
-                    return null;
-                  },
+                  validator: (v) => v == null || v.isEmpty
+                      ? 'Konfirmasi password diperlukan'
+                      : v != _passwordController.text
+                      ? 'Password tidak cocok'
+                      : null,
                 ),
                 const SizedBox(height: 18),
-                ElevatedButton(
-                  onPressed: _register,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1976D2),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                  ),
-                  child: const Text(
-                    'DAFTAR',
-                    style: TextStyle(color: Colors.white),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: _register,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Theme.of(context).primaryColor,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text(
+                      'DAFTAR',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ),
               ],
