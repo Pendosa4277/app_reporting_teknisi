@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -9,21 +10,39 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
-  final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmController = TextEditingController();
+  Future<void> _register() async {
+    if (!_formKey.currentState!.validate()) return;
 
-  void _register() {
-    if (_formKey.currentState!.validate()) {
-      // Simulasi pendaftaran -- di sini Anda bisa memanggil API
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Akun berhasil dibuat (simulasi)')),
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    try {
+      await Supabase.instance.client.auth.signUp(
+        email: email,
+        password: password,
       );
-      // Kembali ke layar login setelah sedikit delay agar SnackBar terlihat
-      Future.delayed(const Duration(milliseconds: 800), () async {
-        if (!mounted) return;
-        Navigator.pop(context);
-      });
+
+      // Supabase may require email confirmation depending on your project
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Pendaftaran berhasil (cek email jika perlu konfirmasi)',
+          ),
+        ),
+      );
+
+      await Future.delayed(const Duration(milliseconds: 800));
+      if (!mounted) return;
+      Navigator.pop(context);
+    } catch (err) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal mendaftar: ${err.toString()}')),
+      );
     }
   }
 
@@ -47,14 +66,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 20),
                 TextFormField(
-                  controller: _usernameController,
+                  controller: _emailController,
+                  keyboardType: TextInputType.emailAddress,
                   decoration: const InputDecoration(
-                    labelText: 'Username',
+                    labelText: 'Email',
                     border: OutlineInputBorder(),
                   ),
                   validator: (v) {
                     if (v == null || v.isEmpty) {
-                      return 'Username tidak boleh kosong';
+                      return 'Email tidak boleh kosong';
+                    }
+                    if (!v.contains('@')) {
+                      return 'Masukkan email yang valid';
                     }
                     return null;
                   },

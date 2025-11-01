@@ -1,6 +1,7 @@
 // File: lib/screens/login_screen.dart
 
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 // Import layar pendaftaran (akan dibuat jika belum ada)
 import 'package:app_reporting_teknisi/screens/register_screen.dart';
 
@@ -60,45 +61,51 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   String? _errorMessage;
+  Future<void> _login() async {
+    if (!_formKey.currentState!.validate()) return;
 
-  void _login() {
-    if (_formKey.currentState!.validate()) {
-      setState(() {
-        _errorMessage = null;
-      });
+    setState(() {
+      _errorMessage = null;
+    });
 
-      final username = _usernameController.text;
-      final password = _passwordController.text;
-      UserRole? role;
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
 
-      // --- Logika Autentikasi dan Peran (Simulasi) ---
-      if (username == 'boss' && password == '123') {
-        role = UserRole.supervisor;
-      } else if (username == 'teknisi' && password == '123') {
-        role = UserRole.technician;
-      } else {
+    try {
+      final res = await Supabase.instance.client.auth.signInWithPassword(
+        email: email,
+        password: password,
+      );
+
+      final user = res.user;
+      if (user == null) {
         setState(() {
-          _errorMessage = 'Username atau Password salah!';
+          _errorMessage = 'Login gagal. Periksa kredensial Anda.';
         });
         return;
       }
 
-      // Navigasi Berdasarkan Peran
-      Widget destinationScreen;
-      if (role == UserRole.supervisor) {
-        destinationScreen = const SupervisorDashboard();
-      } else {
-        destinationScreen = const TechnicianDashboard();
-      }
+      // Sederhana: tentukan role berdasarkan pola email (sesuaikan dengan backend Anda)
+      final role = email.startsWith('boss')
+          ? UserRole.supervisor
+          : UserRole.technician;
+      final destinationScreen = (role == UserRole.supervisor)
+          ? const SupervisorDashboard()
+          : const TechnicianDashboard();
 
+      if (!mounted) return;
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => destinationScreen),
       );
+    } catch (err) {
+      setState(() {
+        _errorMessage = err.toString();
+      });
     }
   }
 
@@ -126,15 +133,19 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 40),
                 TextFormField(
-                  controller: _usernameController,
+                  controller: _emailController,
+                  keyboardType: TextInputType.emailAddress,
                   decoration: const InputDecoration(
-                    labelText: 'Username',
+                    labelText: 'Email',
                     border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.person),
+                    prefixIcon: Icon(Icons.email),
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) {
-                      return 'Username tidak boleh kosong';
+                      return 'Email tidak boleh kosong';
+                    }
+                    if (!value.contains('@')) {
+                      return 'Masukkan email yang valid';
                     }
                     return null;
                   },
