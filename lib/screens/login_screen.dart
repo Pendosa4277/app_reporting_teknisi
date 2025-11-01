@@ -89,10 +89,25 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
 
-      // Sederhana: tentukan role berdasarkan pola email (sesuaikan dengan backend Anda)
-      final role = email.startsWith('boss')
-          ? UserRole.supervisor
-          : UserRole.technician;
+      // Coba ambil role dari tabel `profiles` berdasarkan user id.
+      UserRole role = UserRole.technician; // default
+      try {
+        final profile = await Supabase.instance.client
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .maybeSingle();
+
+        if (profile != null &&
+            profile is Map &&
+            profile['role'] == 'supervisor') {
+          role = UserRole.supervisor;
+        }
+      } catch (_) {
+        // Jika query gagal, fallback ke heuristic berbasis email
+        if (email.startsWith('boss')) role = UserRole.supervisor;
+      }
+
       final destinationScreen = (role == UserRole.supervisor)
           ? const SupervisorDashboard()
           : const TechnicianDashboard();
@@ -112,7 +127,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Login Sistem Operasional')),
+      appBar: AppBar(centerTitle: true, title: const Text('')),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(32.0),
@@ -123,7 +138,13 @@ class _LoginScreenState extends State<LoginScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: <Widget>[
                 const Text(
-                  'Masuk ke Akun Anda',
+                  'PT. SMARTNET VINVELTAMA TEKNOLOGI',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'APP REPORTING TEKNISI',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 28,

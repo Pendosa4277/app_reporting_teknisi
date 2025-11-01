@@ -13,6 +13,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmController = TextEditingController();
+  String _selectedRole = 'technician';
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -20,12 +21,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final password = _passwordController.text;
 
     try {
-      await Supabase.instance.client.auth.signUp(
+      final res = await Supabase.instance.client.auth.signUp(
         email: email,
         password: password,
       );
 
-      // Supabase may require email confirmation depending on your project
+      final user = res.user;
+      // Try to persist role into a `profiles` table (optional). If the table
+      // doesn't exist the insert will fail — that's fine, we silently continue.
+      try {
+        if (user != null) {
+          await Supabase.instance.client.from('profiles').insert({
+            'id': user.id,
+            'email': email,
+            'role': _selectedRole,
+          });
+        }
+      } catch (_) {
+        // ignore errors if table missing or insert fails
+      }
+
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -81,6 +96,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     }
                     return null;
                   },
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: _selectedRole,
+                  decoration: const InputDecoration(
+                    labelText: 'Roleplay',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'technician',
+                      child: Text('Teknisi'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'supervisor',
+                      child: Text('Supervisor'),
+                    ),
+                  ],
+                  onChanged: (v) =>
+                      setState(() => _selectedRole = v ?? 'technician'),
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
