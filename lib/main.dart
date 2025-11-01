@@ -12,10 +12,10 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   const supabaseUrl = String.fromEnvironment(
-    'https://oinkesvadvivgflntjei.supabase.co',
+    'https://scggbgdtpqysqjwmjbzo.supabase.co',
   );
   const supabaseAnonKey = String.fromEnvironment(
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9pbmtlc3ZhZHZpdmdmbG50amVpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIwMDEzNzIsImV4cCI6MjA3NzU3NzM3Mn0.RDNUkOvEPYXPEPX5SDHNlFxsSgoJIFJ86JdM9XKCSOU',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNjZ2diZ2R0cHF5c3Fqd21qYnpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIwMDU2MzQsImV4cCI6MjA3NzU4MTYzNH0.GG2E_JsVDp_f2_iy_RAFxcU_v6-P_0viOEJl_Yxl9jU',
   );
 
   if (supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty) {
