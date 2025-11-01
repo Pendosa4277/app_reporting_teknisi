@@ -11,20 +11,30 @@ import 'package:app_reporting_teknisi/screens/supervisor_dashboard.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Read the Supabase URL and ANON key from compile-time defines (flutter --dart-define)
+  // Example: flutter run --dart-define=SUPABASE_URL="https://..." --dart-define=SUPABASE_ANON_KEY="ey..."
   const supabaseUrl = String.fromEnvironment(
     'https://scggbgdtpqysqjwmjbzo.supabase.co',
+    defaultValue: '',
   );
   const supabaseAnonKey = String.fromEnvironment(
     'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNjZ2diZ2R0cHF5c3Fqd21qYnpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIwMDU2MzQsImV4cCI6MjA3NzU4MTYzNH0.GG2E_JsVDp_f2_iy_RAFxcU_v6-P_0viOEJl_Yxl9jU',
+    defaultValue: '',
   );
 
   if (supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty) {
-    await Supabase.initialize(
-      url: supabaseUrl,
-      anonKey: supabaseAnonKey,
-      // Optionally set debug to true while developing
-      debug: false,
-    );
+    try {
+      // Ensure initialize completes before runApp so Supabase.instance is available.
+      await Supabase.initialize(
+        url: supabaseUrl,
+        anonKey: supabaseAnonKey,
+        debug: false,
+      );
+      debugPrint('Supabase initialized');
+    } catch (e, st) {
+      debugPrint('Supabase.initialize failed: $e');
+      debugPrint('$st');
+    }
   } else {
     // If keys are not provided we continue but Supabase calls will fail.
     // This allows the app to run in offline/demo mode.

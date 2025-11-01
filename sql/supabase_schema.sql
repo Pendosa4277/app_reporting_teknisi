@@ -16,8 +16,18 @@ create table if not exists public.profiles (
   updated_at timestamptz not null default now()
 );
 
-alter table public.profiles
-  add constraint if not exists profiles_role_check check (role in ('technician','supervisor'));
+-- Add role check constraint if it doesn't already exist (some Postgres versions
+-- / Supabase do not support IF NOT EXISTS on ADD CONSTRAINT).
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'profiles_role_check'
+  ) THEN
+    ALTER TABLE public.profiles
+      ADD CONSTRAINT profiles_role_check CHECK (role IN ('technician','supervisor'));
+  END IF;
+END
+$$;
 
 -- 2) tasks table
 create table if not exists public.tasks (
@@ -43,25 +53,34 @@ create table if not exists public.reports (
 );
 
 -- 4) Triggers to update updated_at
-create function if not exists public.trigger_set_timestamp()
-returns trigger language plpgsql as $$
-begin
-  new.updated_at = now();
-  return new;
-end;
+-- Some Postgres/Supabase builds don't support CREATE FUNCTION IF NOT EXISTS.
+-- Create the trigger function only if it doesn't already exist.
+-- Create or replace trigger function for updated_at
+CREATE OR REPLACE FUNCTION public.trigger_set_timestamp()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
 $$;
 
-create trigger if not exists tasks_set_timestamp
-  before update on public.tasks
-  for each row execute procedure public.trigger_set_timestamp();
+-- Create triggers (use DROP IF EXISTS then CREATE to avoid incompatibilities)
+DROP TRIGGER IF EXISTS tasks_set_timestamp ON public.tasks;
+CREATE TRIGGER tasks_set_timestamp
+  BEFORE UPDATE ON public.tasks
+  FOR EACH ROW EXECUTE PROCEDURE public.trigger_set_timestamp();
 
-create trigger if not exists reports_set_timestamp
-  before update on public.reports
-  for each row execute procedure public.trigger_set_timestamp();
+DROP TRIGGER IF EXISTS reports_set_timestamp ON public.reports;
+CREATE TRIGGER reports_set_timestamp
+  BEFORE UPDATE ON public.reports
+  FOR EACH ROW EXECUTE PROCEDURE public.trigger_set_timestamp();
 
-create trigger if not exists profiles_set_timestamp
-  before update on public.profiles
-  for each row execute procedure public.trigger_set_timestamp();
+DROP TRIGGER IF EXISTS profiles_set_timestamp ON public.profiles;
+CREATE TRIGGER profiles_set_timestamp
+  BEFORE UPDATE ON public.profiles
+  FOR EACH ROW EXECUTE PROCEDURE public.trigger_set_timestamp();
 
 -- 5) Enable Row Level Security (RLS)
 alter table public.profiles enable row level security;
@@ -69,85 +88,94 @@ alter table public.tasks enable row level security;
 alter table public.reports enable row level security;
 
 -- 6) Policies for profiles: users can manage only their own profile
-create policy if not exists "Select own profile" on public.profiles
-  for select
-  using (auth.uid() = id);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'profiles' AND policyname = 'Select own profile'
+  ) THEN
+    EXECUTE 'CREATE POLICY "Select own profile" ON public.profiles FOR SELECT USING (auth.uid() = id)';
+  END IF;
 
-create policy if not exists "Insert own profile" on public.profiles
-  for insert
-  with check (auth.uid() = id);
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'profiles' AND policyname = 'Insert own profile'
+  ) THEN
+    EXECUTE 'CREATE POLICY "Insert own profile" ON public.profiles FOR INSERT WITH CHECK (auth.uid() = id)';
+  END IF;
 
-create policy if not exists "Update own profile" on public.profiles
-  for update
-  using (auth.uid() = id)
-  with check (auth.uid() = id);
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'profiles' AND policyname = 'Update own profile'
+  ) THEN
+    EXECUTE 'CREATE POLICY "Update own profile" ON public.profiles FOR UPDATE USING (auth.uid() = id) WITH CHECK (auth.uid() = id)';
+  END IF;
 
-create policy if not exists "Delete own profile" on public.profiles
-  for delete
-  using (auth.uid() = id);
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'profiles' AND policyname = 'Delete own profile'
+  ) THEN
+    EXECUTE 'CREATE POLICY "Delete own profile" ON public.profiles FOR DELETE USING (auth.uid() = id)';
+  END IF;
+END
+$$;
 
 -- 7) Policies for tasks
 -- Supervisors can view all tasks using existence check on profiles
-create policy if not exists "Select tasks (owner or assigned or supervisor)" on public.tasks
-  for select
-  using (
-    auth.uid() = created_by
-    OR auth.uid() = assigned_to
-    OR exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'supervisor')
-  );
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'tasks' AND policyname = 'Select tasks (owner or assigned or supervisor)'
+  ) THEN
+    EXECUTE 'CREATE POLICY "Select tasks (owner or assigned or supervisor)" ON public.tasks FOR SELECT USING (auth.uid() = created_by OR auth.uid() = assigned_to OR exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = ''supervisor''))';
+  END IF;
 
--- Insert: only allow creating tasks where created_by == auth.uid()
-create policy if not exists "Insert tasks (owner)" on public.tasks
-  for insert
-  with check (auth.uid() = created_by);
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'tasks' AND policyname = 'Insert tasks (owner)'
+  ) THEN
+    EXECUTE 'CREATE POLICY "Insert tasks (owner)" ON public.tasks FOR INSERT WITH CHECK (auth.uid() = created_by)';
+  END IF;
 
--- Update: allow assigned_to or creator to update the task
-create policy if not exists "Update tasks (owner or assigned)" on public.tasks
-  for update
-  using (
-    auth.uid() = created_by
-    OR auth.uid() = assigned_to
-  )
-  with check (
-    -- created_by cannot be forged/changed to someone else on update
-    created_by = old.created_by
-  );
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'tasks' AND policyname = 'Update tasks (owner or assigned)'
+  ) THEN
+  EXECUTE 'CREATE POLICY "Update tasks (owner or assigned)" ON public.tasks FOR UPDATE USING (auth.uid() = created_by OR auth.uid() = assigned_to) WITH CHECK (created_by = auth.uid())';
+  END IF;
 
--- Delete: only creator can delete
-create policy if not exists "Delete tasks (creator)" on public.tasks
-  for delete
-  using (auth.uid() = created_by);
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'tasks' AND policyname = 'Delete tasks (creator)'
+  ) THEN
+    EXECUTE 'CREATE POLICY "Delete tasks (creator)" ON public.tasks FOR DELETE USING (auth.uid() = created_by)';
+  END IF;
+END
+$$;
 
 -- 8) Policies for reports
 -- Supervisors can read all reports; authors can access their own
-create policy if not exists "Select reports (author or supervisor)" on public.reports
-  for select
-  using (
-    auth.uid() = author
-    OR exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'supervisor')
-  );
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'reports' AND policyname = 'Select reports (author or supervisor)'
+  ) THEN
+    EXECUTE 'CREATE POLICY "Select reports (author or supervisor)" ON public.reports FOR SELECT USING (auth.uid() = author OR exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = ''supervisor''))';
+  END IF;
 
--- Insert: must be author
-create policy if not exists "Insert reports (author)" on public.reports
-  for insert
-  with check (auth.uid() = author);
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'reports' AND policyname = 'Insert reports (author)'
+  ) THEN
+    EXECUTE 'CREATE POLICY "Insert reports (author)" ON public.reports FOR INSERT WITH CHECK (auth.uid() = author)';
+  END IF;
 
--- Update: only author or supervisor can update (supervisor typically via admin UI)
-create policy if not exists "Update reports (author or supervisor)" on public.reports
-  for update
-  using (
-    auth.uid() = author
-    OR exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'supervisor')
-  )
-  with check (author = old.author);
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'reports' AND policyname = 'Update reports (author or supervisor)'
+  ) THEN
+  -- Keep update restricted to the original author to avoid allowing supervisors to change authorship via client
+  EXECUTE 'CREATE POLICY "Update reports (author or supervisor)" ON public.reports FOR UPDATE USING (auth.uid() = author) WITH CHECK (author = auth.uid())';
+  END IF;
 
--- Delete: only supervisor (admin-like) or original author
-create policy if not exists "Delete reports (author or supervisor)" on public.reports
-  for delete
-  using (
-    auth.uid() = author
-    OR exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = 'supervisor')
-  );
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'reports' AND policyname = 'Delete reports (author or supervisor)'
+  ) THEN
+    EXECUTE 'CREATE POLICY "Delete reports (author or supervisor)" ON public.reports FOR DELETE USING (auth.uid() = author OR exists (select 1 from public.profiles p where p.id = auth.uid() and p.role = ''supervisor''))';
+  END IF;
+END
+$$;
 
 -- 9) Useful indexes
 create index if not exists idx_tasks_assigned_to on public.tasks (assigned_to);
