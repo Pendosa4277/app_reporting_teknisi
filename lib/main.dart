@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 // Import file LoginScreen dari folder screens
 import 'package:app_reporting_teknisi/screens/login_screen.dart';
+import 'package:app_reporting_teknisi/screens/technician_dashboard.dart';
+import 'package:app_reporting_teknisi/screens/supervisor_dashboard.dart';
 
 /// Supabase expects you to provide the URL and ANON KEY at runtime.
 /// For security don't commit real keys. Provide them when running the app:
@@ -45,8 +47,12 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.blue,
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
-      // Atur home ke LoginScreen yang diimpor dari folder screens
-      home: const LoginScreen(),
+      initialRoute: '/',
+      routes: {
+        '/': (context) => const LoginScreen(),
+        '/technician': (context) => const TechnicianDashboard(),
+        '/supervisor': (context) => const SupervisorDashboard(),
+      },
     );
   }
 }

@@ -8,48 +8,7 @@ import 'package:app_reporting_teknisi/screens/register_screen.dart';
 // Definisi enum untuk peran (Role) pengguna
 enum UserRole { technician, supervisor }
 
-// --- Halaman Dasbor (Target Setelah Login) ---
-
-class TechnicianDashboard extends StatelessWidget {
-  const TechnicianDashboard({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Dashboard Teknisi 🛠️')),
-      body: const Center(
-        child: Text(
-          'Selamat Datang, Teknisi!',
-          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-        ),
-      ),
-    );
-  }
-}
-
-class SupervisorDashboard extends StatelessWidget {
-  const SupervisorDashboard({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Dashboard Supervisor 👑')),
-      body: const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              'Selamat Datang, Supervisor!',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 10),
-            Text('Akses Penuh ke Laporan Kinerja Tim'),
-          ],
-        ),
-      ),
-    );
-  }
-}
+// --- Halaman Login Utama ---
 
 // --- Halaman Login Utama ---
 
@@ -108,15 +67,12 @@ class _LoginScreenState extends State<LoginScreen> {
         if (email.startsWith('boss')) role = UserRole.supervisor;
       }
 
-      final destinationScreen = (role == UserRole.supervisor)
-          ? const SupervisorDashboard()
-          : const TechnicianDashboard();
-
       if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => destinationScreen),
-      );
+      if (role == UserRole.supervisor) {
+        Navigator.pushReplacementNamed(context, '/supervisor');
+      } else {
+        Navigator.pushReplacementNamed(context, '/technician');
+      }
     } catch (err) {
       setState(() {
         _errorMessage = err.toString();
