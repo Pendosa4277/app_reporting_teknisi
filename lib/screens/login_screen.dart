@@ -31,6 +31,17 @@ class _LoginScreenState extends State<LoginScreen> {
       _errorMessage = null;
     });
 
+    // Guard: ensure Supabase has been initialized to avoid assertion failures
+    try {
+      final _ = Supabase.instance.client;
+    } catch (e) {
+      setState(() {
+        _errorMessage =
+            'Supabase belum diinisialisasi. Jalankan aplikasi dengan SUPABASE_URL dan SUPABASE_ANON_KEY.';
+      });
+      return;
+    }
+
     final email = _emailController.text.trim();
     final password = _passwordController.text;
 

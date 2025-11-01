@@ -19,7 +19,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     final email = _emailController.text.trim();
     final password = _passwordController.text;
-
+    // Guard: ensure Supabase has been initialized (avoid assertion failure)
+    try {
+      // Accessing Supabase.instance.client will throw if not initialized
+      final _ = Supabase.instance.client;
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Supabase belum diinisialisasi. Jalankan aplikasi dengan SUPABASE_URL dan SUPABASE_ANON_KEY.',
+          ),
+        ),
+      );
+      return;
+    }
     try {
       final res = await Supabase.instance.client.auth.signUp(
         email: email,
